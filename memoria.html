@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Memoria de cartas</title>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="css/styles.css" rel="stylesheet">
+</head>
+
+<body class="mem-body">
+
+    <!-- barra superior: en movil se abre con el boton de hamburguesa -->
+    <nav class="navbar navbar-expand-md bg-white px-3">
+        <div class="container-fluid">
+            <a class="navbar-brand fw-bold mem-texto-oscuro d-flex align-items-center" href="index.html">
+                <svg class="logo-icon me-2" width="32" height="32" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="10"/></svg>JuegosYa
+            </a>
+            <button class="navbar-toggler border-0" type="button" data-bs-toggle="collapse" data-bs-target="#menu" aria-controls="menu" aria-expanded="false" aria-label="Abrir menú">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse justify-content-end" id="menu">
+                <ul class="navbar-nav">
+                    <li class="nav-item"><a class="nav-link mem-link" href="index.html">Inicio</a></li>
+                    <li class="nav-item"><a class="nav-link mem-link mem-link-activo fw-bold text-decoration-underline" href="memoria.html">Memoria</a></li>
+                    <li class="nav-item"><a class="nav-link mem-link" href="atrapa.html">Atrapa</a></li>
+                    <li class="nav-item"><a class="nav-link mem-link" href="index.html#registro">Registro</a></li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <main class="container py-4">
+        <!-- tablet (md) y PC: juego a la izquierda, resultado a la derecha | movil: uno debajo del otro -->
+        <div class="row g-4 justify-content-center align-items-start">
+
+            <section class="col-12 col-md-7 col-xl-6">
+                <h1 class="fw-bold mem-texto-oscuro mb-1">Memoria de cartas</h1>
+                <p class="mem-texto-oscuro small">Voltea dos cartas por turno y encuentra todas las parejas.</p>
+
+                <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+                    <span class="mem-pildora d-inline-block rounded-4 px-3 py-2">Intentos <strong id="intentos">0</strong></span>
+                    <span class="mem-pildora d-inline-block rounded-4 px-3 py-2">Tiempo <strong id="tiempo">00:00</strong></span>
+                    <button type="button" id="btnNuevo" class="btn btn-sm mem-btn-nuevo rounded-pill px-3">Nuevo juego</button>
+                </div>
+
+                <!-- las 16 cartas las crea el script -->
+                <div id="tablero" class="row row-cols-4 g-2 g-md-3"></div>
+            </section>
+
+            <aside class="col-12 col-md-5 col-xl-4">
+                <div id="resultado" class="mem-resultado rounded-4 p-4 text-white d-none">
+                    <h2 class="h4 fw-bold">¡Lo lograste!</h2>
+                    <span id="resumen" class="badge rounded-pill mem-insignia mb-3"></span>
+                    <p class="small">¿Quieres registrarte para recibir novedades? Es opcional.</p>
+                    <div class="d-grid gap-2">
+                        <a href="index.html#registro" class="btn mem-btn-coral rounded-pill fw-bold">Registrarme</a>
+                        <button type="button" id="btnSeguir" class="btn mem-btn-borde rounded-pill fw-bold">Seguir navegando</button>
+                    </div>
+                </div>
+            </aside>
+
+        </div>
+    </main>
+
+    <!-- aviso al volver a jugar -->
+    <div class="modal fade" id="modalRegistro" tabindex="-1" aria-labelledby="modalRegistroTitulo" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content rounded-4 text-center p-3">
+                <div class="modal-body">
+                    <h2 class="h4 fw-bold" id="modalRegistroTitulo">¡Regístrate!</h2>
+                    <p>Regístrate para recibir novedades. Si prefieres, puedes omitir y seguir jugando.</p>
+                    <div class="d-grid gap-2">
+                        <a href="index.html#registro" class="btn btn-violet rounded-pill fw-bold">Registrarme</a>
+                        <button type="button" id="btnOmitir" class="btn btn-indigo rounded-pill fw-bold">Omitir</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // imagenes: una por pareja (8 parejas = 16 cartas)
+        const imagenes = [
+            "img/carta1.png", "img/carta2.png",
+            "img/carta3.png", "img/carta4.png",
+            "img/carta5.png", "img/carta6.png",
+            "img/carta7.png", "img/carta8.png"
+        ];
+        const reverso = "img/reverso.png";
+
+        const tablero = document.getElementById("tablero");
+        const intentosTxt = document.getElementById("intentos");
+        const tiempoTxt = document.getElementById("tiempo");
+        const resultado = document.getElementById("resultado");
+        const resumen = document.getElementById("resumen");
+        const modalRegistro = new bootstrap.Modal(document.getElementById("modalRegistro"));
+
+        let cartas = [];          // cada carta: { pareja, encontrada }
+        let primera = null;       // posicion de la primera carta volteada
+        let bloqueado = false;    // evita voltear mas de 2 a la vez
+        let intentos = 0;
+        let encontradas = 0;
+        let segundos = 0;
+        let reloj = null;
+        let terminado = false;    // true cuando se completo una partida
+
+        function formatoTiempo(s) {
+            let min = String(Math.floor(s / 60)).padStart(2, "0");
+            let seg = String(s % 60).padStart(2, "0");
+            return min + ":" + seg;
+        }
+
+        function mezclar(lista) {
+            for (let i = lista.length - 1; i > 0; i--) {
+                let j = Math.floor(Math.random() * (i + 1));
+                [lista[i], lista[j]] = [lista[j], lista[i]];
+            }
+            return lista;
+        }
+
+        function iniciar() {
+            clearInterval(reloj);
+            reloj = null;
+            segundos = 0;
+            intentos = 0;
+            encontradas = 0;
+            primera = null;
+            bloqueado = false;
+            terminado = false;
+            intentosTxt.textContent = 0;
+            tiempoTxt.textContent = "00:00";
+            resultado.classList.add("d-none");
+
+            // dos cartas por cada imagen y se mezclan
+            cartas = [];
+            for (let i = 0; i < imagenes.length; i++) {
+                cartas.push({ pareja: i, encontrada: false });
+                cartas.push({ pareja: i, encontrada: false });
+            }
+            mezclar(cartas);
+
+            tablero.innerHTML = "";
+            for (let i = 0; i < cartas.length; i++) {
+                let col = document.createElement("div");
+                col.className = "col";
+                col.innerHTML =
+                    '<div class="ratio ratio-1x1 mem-carta border border-3 rounded-3 overflow-hidden" role="button" id="carta' + i + '" onclick="voltear(' + i + ')">' +
+                    '<img src="' + reverso + '" class="object-fit-cover" alt="Carta">' +
+                    '</div>';
+                tablero.appendChild(col);
+            }
+        }
+
+        function mostrar(i, frente) {
+            let img = document.querySelector("#carta" + i + " img");
+            if (frente) {
+                img.src = imagenes[cartas[i].pareja];
+            } else {
+                img.src = reverso;
+            }
+        }
+
+        function voltear(i) {
+            if (bloqueado || cartas[i].encontrada || i === primera) {
+                return;
+            }
+
+            // el tiempo empieza con la primera carta
+            if (reloj === null) {
+                reloj = setInterval(function () {
+                    segundos++;
+                    tiempoTxt.textContent = formatoTiempo(segundos);
+                }, 1000);
+            }
+
+            mostrar(i, true);
+
+            if (primera === null) {
+                primera = i;
+                return;
+            }
+
+            // segunda carta: se cuenta un intento
+            intentos++;
+            intentosTxt.textContent = intentos;
+
+            if (cartas[primera].pareja === cartas[i].pareja) {
+                cartas[primera].encontrada = true;
+                cartas[i].encontrada = true;
+                document.getElementById("carta" + primera).classList.add("mem-acierto");
+                document.getElementById("carta" + i).classList.add("mem-acierto");
+                encontradas++;
+                primera = null;
+                if (encontradas === imagenes.length) {
+                    ganar();
+                }
+            } else {
+                bloqueado = true;
+                let anterior = primera;
+                setTimeout(function () {
+                    mostrar(anterior, false);
+                    mostrar(i, false);
+                    primera = null;
+                    bloqueado = false;
+                }, 800);
+            }
+        }
+
+        function ganar() {
+            clearInterval(reloj);
+            terminado = true;
+            resumen.textContent = intentos + " intentos · " + formatoTiempo(segundos);
+            resultado.classList.remove("d-none");
+        }
+
+        // Nuevo juego: si ya terminó una partida, primero se invita a registrarse
+        document.getElementById("btnNuevo").addEventListener("click", function () {
+            if (terminado) {
+                modalRegistro.show();
+            } else {
+                iniciar();
+            }
+        });
+
+        // Omitir: cierra el aviso y deja seguir jugando
+        document.getElementById("btnOmitir").addEventListener("click", function () {
+            modalRegistro.hide();
+            iniciar();
+        });
+
+        // Seguir navegando: va al panel principal con los juegos
+        document.getElementById("btnSeguir").addEventListener("click", function () {
+            window.location.href = "index.html#juegos";
+        });
+
+        iniciar();
+    </script>
+</body>
+</html>
