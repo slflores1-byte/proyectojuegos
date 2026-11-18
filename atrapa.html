@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Atrapa los objetos · JuegosYa</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&display=swap">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <nav class="navbar navbar-expand-md bg-white sticky-top px-3">
+    <div class="container-fluid">
+      <a class="navbar-brand fw-bold d-flex align-items-center" href="index.html">
+        <svg class="logo-icon me-2" width="32" height="32" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="10"/></svg>JuegosYa
+      </a>
+      <button class="navbar-toggler border-0" type="button" data-bs-toggle="collapse" data-bs-target="#nav" aria-controls="nav" aria-expanded="false" aria-label="Abrir menú">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+      <div class="collapse navbar-collapse justify-content-end" id="nav">
+        <ul class="navbar-nav">
+          <li class="nav-item"><a class="nav-link" href="index.html">Inicio</a></li>
+          <li class="nav-item"><a class="nav-link" href="memoria.html">Memoria</a></li>
+          <li class="nav-item"><a class="nav-link active fw-bold text-decoration-underline" href="atrapa.html" aria-current="page">Atrapa</a></li>
+          <li class="nav-item"><a class="nav-link" href="index.html#registro">Registro</a></li>
+        </ul>
+      </div>
+    </div>
+  </nav>
+
+  <main class="container-fluid px-3 px-md-5 py-4">
+    <!-- tablet (md) y PC: juego a la izquierda, resultado a la derecha | movil: uno debajo del otro -->
+    <div class="row g-4 align-items-start">
+      <section class="col-12 col-md-8">
+        <h1 class="fw-bold mb-1">Atrapa los objetos</h1>
+        <p>Toca los animalitos antes de que desaparezcan. El unicornio vale 3 puntos.</p>
+        <div class="d-flex flex-wrap gap-2 my-3">
+          <div class="bg-white rounded-4 px-3 py-2">Puntos <b class="fs-5 ms-1" id="score">0</b></div>
+          <div class="bg-white rounded-4 px-3 py-2">Tiempo <b class="fs-5 ms-1" id="time">30</b></div>
+        </div>
+
+        <div class="arena-box ratio ratio-4x3 border border-3 rounded-4 overflow-hidden">
+          <div class="arena user-select-none" id="arena">
+            <div class="overlay position-absolute top-0 start-0 w-100 h-100 d-flex flex-column align-items-center justify-content-center gap-3 p-4 text-center" id="startPanel">
+              <h2 class="fw-bold">¿Listo para jugar?</h2>
+              <p class="mb-0">Tienes 30 segundos. Cada animalito que toques suma puntos.</p>
+              <button class="btn btn-indigo btn-lg rounded-pill fw-bold px-4" id="startBtn">Empezar</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <aside class="col-12 col-md-4" id="invite" hidden aria-live="polite">
+        <div class="invite rounded-4 p-4 text-white">
+          <h2 class="fw-bold mb-3">¡Se acabó el tiempo!</h2>
+          <div class="result d-inline-block rounded-pill fw-bold px-3 py-2 mb-3" id="result"></div>
+          <p>¿Quieres registrarte para recibir novedades? Es opcional.</p>
+          <div class="d-grid gap-3">
+            <a class="btn btn-violet btn-lg rounded-pill fw-bold" id="registerLink" href="index.html#registro">Registrarme</a>
+            <button class="btn btn-outline-light btn-lg rounded-pill fw-bold" id="skipBtn" type="button">Seguir navegando</button>
+          </div>
+        </div>
+      </aside>
+    </div>
+  </main>
+
+  <!-- aviso al volver a jugar -->
+  <div class="modal fade" id="modalRegistro" tabindex="-1" aria-labelledby="modalRegistroTitulo" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content rounded-4 text-center p-3">
+        <div class="modal-body">
+          <h2 class="h4 fw-bold" id="modalRegistroTitulo">¡Regístrate!</h2>
+          <p>Regístrate para recibir novedades. Si prefieres, puedes omitir y seguir jugando.</p>
+          <div class="d-grid gap-2">
+            <a class="btn btn-violet rounded-pill fw-bold" id="modalRegisterLink" href="index.html#registro">Registrarme</a>
+            <button type="button" class="btn btn-indigo rounded-pill fw-bold" id="omitBtn">Omitir</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+(() => {
+  // ---- Configuración ----
+  const DURACION = 30;                 // segundos por partida
+  const INTERVALO_INICIAL = 800;       // ms entre apariciones
+  const INTERVALO_MINIMO = 450;
+  const VIDA_INICIAL = 1500;           // ms que dura un animalito en pantalla
+  const VIDA_MINIMA = 800;
+  const ANIMALES = ['🐱', '🐶', '🐰', '🐸', '🐥'];
+  const BONUS = { emoji: '🦄', puntos: 3, prob: 0.12 };
+  const COLORES = ['#4B3FD6', '#3F6FE0', '#7A3FD0', '#5B35B5', '#3B4FC4'];
+
+  // ---- Elementos ----
+  const arena = document.getElementById('arena');
+  const startPanel = document.getElementById('startPanel');
+  const startBtn = document.getElementById('startBtn');
+  const scoreEl = document.getElementById('score');
+  const timeEl = document.getElementById('time');
+  const invite = document.getElementById('invite');
+  const resultEl = document.getElementById('result');
+  const registerLink = document.getElementById('registerLink');
+  const modalRegisterLink = document.getElementById('modalRegisterLink');
+  const skipBtn = document.getElementById('skipBtn');
+  const omitBtn = document.getElementById('omitBtn');
+  const modalRegistro = new bootstrap.Modal(document.getElementById('modalRegistro'));
+
+  // ---- Estado ----
+  let puntos = 0, restante = DURACION, jugando = false, yaJugo = false;
+  let relojId = null, spawnId = null;
+
+  const aleatorio = (min, max) => Math.random() * (max - min) + min;
+  const progreso = () => 1 - restante / DURACION; // 0 → 1 durante la partida
+
+  function iniciar() {
+    puntos = 0;
+    restante = DURACION;
+    jugando = true;
+    scoreEl.textContent = 0;
+    timeEl.textContent = restante;
+    invite.hidden = true;
+    startPanel.classList.add('d-none');   // Bootstrap: d-none oculta el panel
+    arena.querySelectorAll('.animal, .plus').forEach(n => n.remove());
+
+    relojId = setInterval(() => {
+      restante--;
+      timeEl.textContent = restante;
+      if (restante <= 0) terminar();
+    }, 1000);
+    programarAparicion();
+  }
+
+  function programarAparicion() {
+    if (!jugando) return;
+    const espera = INTERVALO_INICIAL - (INTERVALO_INICIAL - INTERVALO_MINIMO) * progreso();
+    spawnId = setTimeout(() => { crearAnimal(); programarAparicion(); }, espera);
+  }
+
+  function crearAnimal() {
+    const esBonus = Math.random() < BONUS.prob;
+    const tam = window.innerWidth < 640 ? 54 : 72;
+    const w = arena.clientWidth - tam, h = arena.clientHeight - tam;
+
+    const el = document.createElement('button');
+    el.type = 'button';
+    el.className = 'animal position-absolute rounded-circle border border-5 border-white d-flex align-items-center justify-content-center p-0 lh-1 fade show';
+    el.textContent = esBonus ? BONUS.emoji : ANIMALES[Math.floor(Math.random() * ANIMALES.length)];
+    el.setAttribute('aria-label', esBonus ? 'Unicornio, 3 puntos' : 'Animalito, 1 punto');
+    el.style.width = el.style.height = tam + 'px';
+    el.style.fontSize = (tam * 0.5) + 'px';
+    el.style.setProperty('--c', COLORES[Math.floor(Math.random() * COLORES.length)]);
+    el.style.left = aleatorio(0, w) + 'px';
+    el.style.top = aleatorio(0, h) + 'px';
+
+    const vida = (VIDA_INICIAL - (VIDA_INICIAL - VIDA_MINIMA) * progreso()) * (esBonus ? 0.7 : 1);
+    const quitar = setTimeout(() => el.remove(), vida);
+
+    // pointerdown responde igual con mouse y pantalla táctil
+    el.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      if (!jugando || el.classList.contains('hit')) return;
+      clearTimeout(quitar);
+      sumar(esBonus ? BONUS.puntos : 1, el);
+    });
+    arena.appendChild(el);
+  }
+
+  function sumar(n, el) {
+    puntos += n;
+    scoreEl.textContent = puntos;
+    const mas = document.createElement('span');
+    mas.className = 'plus position-absolute fw-bold fs-5 pe-none fade show';
+    mas.textContent = '+' + n;
+    mas.style.left = el.offsetLeft + 'px';
+    mas.style.top = el.offsetTop + 'px';
+    arena.appendChild(mas);
+    setTimeout(() => mas.classList.remove('show'), 300);   // se desvanece con .fade
+    setTimeout(() => mas.remove(), 600);
+    el.classList.remove('show');                            // se desvanece con .fade
+    el.classList.add('hit', 'pe-none');
+    setTimeout(() => el.remove(), 250);
+  }
+
+  function terminar() {
+    jugando = false;
+    yaJugo = true;
+    clearInterval(relojId);
+    clearTimeout(spawnId);
+    arena.querySelectorAll('.animal').forEach(n => n.remove());
+    timeEl.textContent = 0;
+
+    resultEl.textContent = puntos + (puntos === 1 ? ' punto' : ' puntos');
+    const destino = `index.html?juego=atrapa&puntos=${puntos}#registro`;
+    registerLink.href = destino;
+    modalRegisterLink.href = destino;
+    invite.hidden = false;
+
+    startPanel.querySelector('h2').textContent = 'Partida terminada';
+    startPanel.querySelector('p').textContent = 'Hiciste ' + puntos + ' puntos. ¿Quieres mejorar tu marca?';
+    startBtn.textContent = 'Volver a jugar';
+    startPanel.classList.remove('d-none');
+  }
+
+  // Empezar / Volver a jugar: tras una partida, primero se invita a registrarse
+  startBtn.addEventListener('click', () => {
+    if (yaJugo) {
+      modalRegistro.show();
+    } else {
+      iniciar();
+    }
+  });
+
+  // Omitir: cierra el aviso y deja seguir jugando
+  omitBtn.addEventListener('click', () => {
+    modalRegistro.hide();
+    iniciar();
+  });
+
+  // Seguir navegando: va al panel principal con los juegos
+  skipBtn.addEventListener('click', () => { window.location.href = 'index.html#juegos'; });
+})();
+</script>
+</body>
+</html>
